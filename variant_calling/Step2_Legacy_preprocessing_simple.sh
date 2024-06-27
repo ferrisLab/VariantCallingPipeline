@@ -137,11 +137,12 @@ echo "Start Alignment"
 ### BWA alignment and SAMTOOLS use for read group information ###
 #################################################################
 
-bwa mem -R '@RG\tID:'${SEQID}'\tSM:'${SAMPLE}'\tLB:lib1' -t ${THREADS} ${REF} \
-   ${R1} ${R2} \
- | samtools view -hb -@ ${THREADS} - | samtools sort -n -T $TMPDIR -@ ${THREADS} - -o ${SAMPLE}/${SAMPLE}_aln_pe_sorted.bam
-samtools fixmate -rm -@ ${THREADS} ${SAMPLE}/${SAMPLE}_aln_pe_sorted.bam - \
- | samtools sort -T $TMPDIR -@ ${THREADS} - -o ${SAMPLE}/${SAMPLE}_aln_pe_fm_sorted.bam
+bwa mem -R '@RG\tID:'${SEQID}'\tSM:'${SAMPLE}'\tLB:lib1' -t ${THREADS} ${REF} ${R1} ${R2} | \
+samtools view -hb -@ ${THREADS} - | \
+samtools sort -n -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_sorted.bam
+
+samtools fixmate -rm -@ ${THREADS} ${HEADER}/${SAMPLE}_aln_pe_sorted.bam - | \
+samtools sort -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam
 
 echo "End Alignment"
 

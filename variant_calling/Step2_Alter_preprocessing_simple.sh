@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=BAR_preproces
 #SBATCH --mail-user=baponterolon@tulane.edu
-#SBATCH --mail-type=ALL # Valid values: BEGIN, END, FAIL, REQUEUE and ALL.
+#SBATCH --mail-type=END # Valid values: BEGIN, END, FAIL, REQUEUE and ALL.
 #SBATCH --output=/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/preprocessingout/pre-processing_%A_%a.out
 #SBATCH --error=/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/preprocessingerror/pre-processing_%A_%a.err
 #SBATCH --qos=normal
@@ -105,10 +105,10 @@ R2=$(find ${WD} \
     | sort \
     | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
 
-
-echo ${R1}
-echo ${R2}
-echo ${SLURM_ARRAY_TASK_ID}
+### Print File and Job Variables ###
+echo "R1: ${R1}"
+echo "R2: ${R2}"
+echo "ARRAY_TASK_ID: ${SLURM_ARRAY_TASK_ID}"
 
 # Sample prefix from the R1/R2 files, is in the sample_names.list (ex: KGF_02.._L3)
 # This part changes based on the naming system. The user will have to modify this as needed
@@ -117,16 +117,16 @@ echo ${SLURM_ARRAY_TASK_ID}
 SAMPLE=$(echo $R1 | cut -d "/" -f 10 | cut -d "." -f 1) # Retrieves first element before "."
 HEADER=$(echo $R1 | cut -d "/" -f 10 | cut -d "." -f 1) # Retrieves first element before "." 
 
-echo ${SAMPLE}
-echo ${HEADER}
+### Print Directory and File Name Variables ###
+echo "SAMPLE: ${SAMPLE}"
+echo "HEADER: ${HEADER}"
 
-####################################################################################################
-### Alternative Pipeline for Alignment with BWA, SAMTOOLS, and PICARD for Read Group Information ###
-####################################################################################################
+### To debug make sure to examine the variables and the files they are assigned to.
 
-##################################################################################################
-### Allignment with BWA, quality control with SAMTOOLS, and read group information with PICARD ###
-##################################################################################################
+##################################################################################
+### Alternative Pipeline for alignment with BWA, quality control with SAMTOOLS, 
+### and read group information with PICARD.
+###################################################################################
 # Adapted from @bergcollete's GitHub: YNP_GWAS/scripts/YNP4alignment.sh 
 
 ### VARIABLES FOR READ GROUP INFORMATION ###
@@ -142,13 +142,16 @@ cd ${OUTPUT_DIR}
 mkdir ${HEADER}  #makes a directory for each biological sample.
 
 
+### CREATE OUTPUT DIRECTORY ###
+mkdir -p ${HEADER}
+
 ### Map reads to the genome AND Quality filter and sort sam, making a bam file
 echo "Aligning bwa mem quality filtering, and sorting for ${SAMPLE}"
 
-# bwa mem -R '@RG\tID:'${SEQID}'\tSM:'${SAMPLE}'\tLB:lib1' -t ${THREADS} ${REF} ${R1} ${R2} | \
 bwa mem -t ${THREADS} ${REF} ${R1} ${R2} | \
 samtools view -hb -@ ${THREADS} - | \
-samtools sort -n -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_sorted.bam | \
+samtools sort -n -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_sorted.bam
+
 samtools fixmate -rm -@ ${THREADS} ${HEADER}/${SAMPLE}_aln_pe_sorted.bam - | \
 samtools sort -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam
 
@@ -168,7 +171,7 @@ java -jar $PICARD AddOrReplaceReadGroups \
 echo "End Alignment"
 
 ### MARK AND REMOVE DUPLICATE READS ###
-echo "Marking and removing duplicate reads"
+# echo "Marking and removing duplicate reads"
 
 # java -jar $PICARD MarkDuplicates \
 #      I=${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
@@ -194,7 +197,7 @@ echo "Marking and removing duplicate reads"
 # samtools flagstat -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam \
 #    > ${HEADER}/${SAMPLE}_markdup.bam.flagstat.txt
 
-echo "End Flag Stats"
+# echo "End Flag Stats"
 
 module purge
 echo "End Job"
