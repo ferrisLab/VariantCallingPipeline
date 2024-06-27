@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=BAR_preproces
 #SBATCH --mail-user=baponterolon@tulane.edu
+#SBATCH --mail-type=ALL # Valid values: BEGIN, END, FAIL, REQUEUE and ALL.
 #SBATCH --output=/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/preprocessingout/pre-processing_%A_%a.out
 #SBATCH --error=/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/preprocessingerror/pre-processing_%A_%a.err
 #SBATCH --qos=normal
@@ -38,8 +39,8 @@ This script is designed to prepare samples for GATK varient calling.
 It begins with sequence files in seqdata.fq.gz or seqdata.fq format.
 
 As opposed to the Legacy pipeline, which assigns read group information
-with `bwa`, this one uses `bwa mem` for alignment, `samtools` for quality control, 
-and `picard` for read group information. 
+with bwa, this one uses bwa mem for alignment, samtools for quality control, 
+and picard for read group information. 
 
 The workflow is as follows:
     -Perform the alignment with bwa -mem
@@ -75,6 +76,7 @@ echo "Start Job"
 
 #### GLOBAL VARIABLES ###
 WD="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/2_fastQC"
+SEQID="bar_mim3" # Read group identifier/Project name and date for bam header
 REF="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/MimulusGuttatus_reference/MguttatusTOL_551_v5.0.fa" # Path to reference genome
 THREADS=20 # Number of threads to use
 TMPDIR="/lustre/project/svanbael/TMPDIR" # Designated storage folders for temporary files (should be empty at end)
@@ -128,7 +130,8 @@ echo ${HEADER}
 # Adapted from @bergcollete's GitHub: YNP_GWAS/scripts/YNP4alignment.sh 
 
 ### VARIABLES FOR READ GROUP INFORMATION ###
-RGID= "bar_mim3" # Read group identifier/project name
+RGID=${SEQID} # Read group identifier/project name. In this case it is the same as $SEQID. 
+              # It can be called variable by just writing "bar_mim3", for example.
 RGLB="lib1" # Library name (could be anything)
 RGPL="ILLUMINA" # Sequencing platform
 RGPU="unit1" # Generic identifier for the platform unit
@@ -142,6 +145,7 @@ mkdir ${HEADER}  #makes a directory for each biological sample.
 ### Map reads to the genome AND Quality filter and sort sam, making a bam file
 echo "Aligning bwa mem quality filtering, and sorting for ${SAMPLE}"
 
+# bwa mem -R '@RG\tID:'${SEQID}'\tSM:'${SAMPLE}'\tLB:lib1' -t ${THREADS} ${REF} ${R1} ${R2} | \
 bwa mem -t ${THREADS} ${REF} ${R1} ${R2} | \
 samtools view -hb -@ ${THREADS} - | \
 samtools sort -n -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_sorted.bam | \
@@ -152,43 +156,43 @@ samtools sort -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_fm_sorted
 echo "Adding read group information to ${SAMPLE}"
 
 java -jar $PICARD AddOrReplaceReadGroups \
-    -INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam \
-    -OUTPUT ${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
-    -RGSM ${SAMPLE} \
-    -RGID $RGID \
-    -RGLB $RGLB \
-    -RGPL $RPGL \
-    -RGPU $RGPU \
-    -VALIDATION_STRINGENCY LENIENT # adds read groups
+    I=${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam \
+    O=${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
+    RGSM=${SAMPLE} \
+    RGID=${SEQID} \
+    RGLB=$RGLB \
+    RGPL=$RPGL \
+    RGPU=$RGPU \
+    VALIDATION_STRINGENCY=LENIENT # adds read groups
 
 echo "End Alignment"
 
 ### MARK AND REMOVE DUPLICATE READS ###
 echo "Marking and removing duplicate reads"
 
-java -jar $PICARD MarkDuplicates \
-     -INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam \
-     -OUTPUT ${HEADER}/${SAMPLE}_markdup.bam \
-     -METRICS_FILE ${HEADER}/${SAMPLE}_dup_metrics.txt \
-     -ASSUME_SORTED true \
-     -REMOVE_DUPLICATES true \
-     -VALIDATION_STRINGENCY LENIENT \
-     -TMP_DIR $TMPDIR
+# java -jar $PICARD MarkDuplicates \
+#      I=${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
+#      O=${HEADER}/${SAMPLE}_markdup.bam \
+#      METRICS_FILE=${HEADER}/${SAMPLE}_dup_metrics.txt \
+#      ASSUME_SORTED=true \
+#      REMOVE_DUPLICATES=true \
+#      VALIDATION_STRINGENCY=LENIENT \
+#      TMP_DIR=$TMPDIR
 
-echo "End Marking and removing duplicate reads"
+# echo "End Marking and removing duplicate reads"
 
-### INDEXING THE BAM FILE & FLAG STATS##
-echo "Indexing the bam file and calculating flag stats"
+# ### INDEXING THE BAM FILE & FLAG STATS##
+# echo "Indexing the bam file and calculating flag stats"
 
-samtools index -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam
+# samtools index -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam
 
-echo "End Indexing"
+# echo "End Indexing"
 
-### LOOKING AT ALIGNMENT AGAIN ###
-### `flagstat` counts the number of alignments for each FLAG type and calculates and prints statistics
-echo "Calculating flag stats"
-samtools flagstat -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam \
-   > ${HEADER}/${SAMPLE}_markdup.bam.flagstat.txt
+# ### LOOKING AT ALIGNMENT AGAIN ###
+# ### `flagstat` counts the number of alignments for each FLAG type and calculates and prints statistics
+# echo "Calculating flag stats"
+# samtools flagstat -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam \
+#    > ${HEADER}/${SAMPLE}_markdup.bam.flagstat.txt
 
 echo "End Flag Stats"
 

@@ -71,21 +71,10 @@ ln -s ${INPUT}* .
 ### Running FastQC ###
 ### Original code ###
 echo "Start FastQC"
-for fastq in /lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/2_fastQC/*;do
-fastqc $fastq -o /lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/2_fastQC/fastQC_files/
+for fastq in ${WD}*;do
+fastqc $fastq -o ${OUTPUT}
 done
 echo "End FastQC"
-
-### Running FastQC ###
-### Alternative code ###
-echo "Start FastQC"
-for i in *.fq.gz; do
-    fastq=$WD$i
-    fastqc $fastq -o $OUTPUT
-done
-
-echo "End FastQC"
-
 
 ### running MultiQC (using Fastqc files) ###
 
