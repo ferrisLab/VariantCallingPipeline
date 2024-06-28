@@ -14,6 +14,7 @@
 
 ### LOAD MODULES ###
 module load java-openjdk
+module load gatk/4.5.0.0
 
 ###############################################
 ### Fixin mate information in the bam files ###
@@ -32,22 +33,21 @@ P=$(find ${WD}* -type d \
     | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
 
 SAMPLE=$(echo $P | cut -d "/" -f 11) #Retrieves sample name
+HEADER=$(echo $P | cut -d "/" -f 11)
 
 echo ${SAMPLE}
+echo ${HEADER}
 
-SEQID="bar_mim3" # Project name and date for bam header
-REF="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/MimulusGuttatus_reference/MguttatusTOL_551_v5.0.fa" # Path to reference genome
-THREADS=20 # Number of threads to use
-TMPDIR="/lustre/project/svanbael/TMPDIR" # Designated storage folders for temporary files (should be empty at end)
-PICARD="/share/apps/picard/2.20.7/picard.jar" # Path to picard
+#PICARD="/share/apps/picard/2.20.7/picard.jar" # Path to picard
 
 ### FIXING MATE INFORMATION IN BAM FILES ###
 echo "Fixing mate information in ${SAMPLE} bam file"
 
-java -jar $PICARD FixMateInformation \
-       -I ${SAMPLE}/${SAMPLE}_markdup_rrg.bam \
-       -O ${SAMPLE}/${SAMPLE}_markdup_rrg_fm.bam \
-       -ADD_MATE_CIGAR true
+#java -jar $PICARD FixMateInformation \
+gatk FixMateInformation \
+    -I ${HEADER}/${SAMPLE}_markdup_rrg.bam \
+    -O ${HEADER}/${SAMPLE}_markdup_rrg_fm.bam \
+    -ADD_MATE_CIGAR true
 
 echo "Finished fixing mate information in ${SAMPLE} bam file"
 

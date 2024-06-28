@@ -13,9 +13,8 @@
 
 
 ### LOAD MODULES ###
-module load bwa
-module load samtools/1.10
-module load java-openjdk
+module load java-openjdk/1.8.0
+module load gatk/4.5.0.0
 
 ######################################################
 ### Diagnostics for Simple_pre_processing_workflow ###
@@ -24,18 +23,14 @@ module load java-openjdk
 echo "Start Job"
 
 ### GLOBAL VARIABLES ###
-WD="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/alignments_untrimmed"
-SEQID="bar_mim3" #project name and date for bam header
-REF="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/MimulusGuttatus_reference/MguttatusTOL_551_v5.0.fa"
-THREADS=20
-TMPDIR="/lustre/project/svanbael/TMPDIR" #designated storage folders for temporary files (should be empty at end)
-PICARD="/share/apps/picard/2.20.7/picard.jar"
+WD="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/alignments_untrimmed/"
+#PICARD="/share/apps/picard/2.20.7/picard.jar"
 
 ### MOVE TO WORKING DIRECTORY ###
 cd ${WD}
 
 ### ASSIGNING VARIABLES ###
-P=$(find /lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/alignments_untrimmed/* -type d \
+P=$(find ${WD}* -type d \
     | sort \
     | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
 
@@ -43,15 +38,14 @@ SAMPLE=$(echo $P | cut -d "/" -f 11) #Retrieves sample name
 echo ${SAMPLE}
 
 
-
-
 ### BAM DIAGNOSTICS ###
 ### Using new Picard syntax
-java -jar $PICARD ValidateSamFile \
-      -I ${SAMPLE}/${SAMPLE}_markdup.bam \
-      -VALIDATION_STRINGENCY STRICT \
-      -REFERENCE_SEQUENCE $REF \
-      -MODE SUMMARY \
+#java -jar $PICARD ValidateSamFile \
+gatk ValidateSamFile \
+    -I ${SAMPLE}/${SAMPLE}_markdup.bam \
+    -VALIDATION_STRINGENCY STRICT \
+    -REFERENCE_SEQUENCE $REF \
+    -MODE SUMMARY \
 
 
 module purge

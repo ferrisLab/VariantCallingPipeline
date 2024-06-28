@@ -5,9 +5,9 @@
 #SBATCH --output=/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/preprocessingout/pre-processing_%A_%a.out
 #SBATCH --error=/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/preprocessingerror/pre-processing_%A_%a.err
 #SBATCH --qos=normal
-#SBATCH --time=24:00:00
+#SBATCH --time=0-24:00:00
 #SBATCH --mem=256000 #Up to 256000, the maximum increases queue time
-#SBATCH --nodes=1            #: Number of Nodes
+#SBATCH --nodes=2            #: Number of Nodes
 #SBATCH --ntasks-per-node=1  #: Number of Tasks per Node
 #SBATCH --cpus-per-task=20   #: Number of threads per task
 #SBATCH --array=1-474  # Job array (1-n) when n is number of unique samples that came off the sequencer. 499 total
@@ -17,10 +17,15 @@
 module load bwa/0.7.17 
 module load samtools/1.16.1
 module load java-openjdk/1.8.0
+module load picard/3.2 # This is a local module installed in the user's directory. 
+# See https://github.com/broadinstitute/picard for more information on Picard
+# See https://wiki.hpc.tulane.edu/trac/wiki/cypress/ModuleCommand for more information on loading local user modules
+module load gatk/4.5.0.0 # This is a global module installed in Cypress.
+
 
 #####################################################################
 <<Simple_Alter_pre_processing_workflow
-SIMPLE WORKFLOW- samples not split across lanes
+SIMPLE WORKFLOW- samples NOT split across lanes
 Written in spring 2022 by Natalie Gonzalez
 
 Modified by BAR 2024-06-03
@@ -33,9 +38,16 @@ Minor changes include:
 Major changes include:
     - Creating alternative pipeline based on @bergcollete's GitHub: YNP_GWAS/scripts/YNP4alignment.sh 
     for alignment with bwa, samtools, and picard for read group information.
+    - Use of picard/3.2 instead of picard/2.20.7 
+
+To-dos:
+    - Test using picard that comes with GATK4 (/share/apps/gatk/4.5.0.0) this would eliminate
+    the need to load a local user picard module. 
+    See https://gatk.broadinstitute.org/hc/en-us/articles/360036194592-Getting-started-with-GATK4
+    https://gatk.broadinstitute.org/hc/en-us/articles/360035531892-GATK4-command-line-syntax
 
 
-This script is designed to prepare samples for GATK varient calling. 
+This script is designed to prepare samples for GATK variant calling. 
 It begins with sequence files in seqdata.fq.gz or seqdata.fq format.
 
 As opposed to the Legacy pipeline, which assigns read group information
@@ -80,7 +92,7 @@ SEQID="bar_mim3" # Read group identifier/Project name and date for bam header
 REF="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/MimulusGuttatus_reference/MguttatusTOL_551_v5.0.fa" # Path to reference genome
 THREADS=20 # Number of threads to use
 TMPDIR="/lustre/project/svanbael/TMPDIR" # Designated storage folders for temporary files (should be empty at end)
-PICARD="/share/apps/picard/2.20.7/picard.jar" # Path to picard
+PICARD="/lustre/project/svanbael/bolivar/software/picard/build/libs/picard.jar" # Path to picard
 OUTPUT_DIR="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/alignments_untrimmed/" # Path to directory where alignment files will be stored
 
 ### NAVIGATING TO THE DIRECTORY CONTAINING THE FASTQ FILES ###
@@ -132,9 +144,11 @@ echo "HEADER: ${HEADER}"
 ### VARIABLES FOR READ GROUP INFORMATION ###
 RGID=${SEQID} # Read group identifier/project name. In this case it is the same as $SEQID. 
               # It can be called variable by just writing "bar_mim3", for example.
-RGLB="lib1" # Library name (could be anything)
+RGLB="8850_240112B9" # Library name (could be anything). Using the order # and run date.
 RGPL="ILLUMINA" # Sequencing platform
-RGPU="unit1" # Generic identifier for the platform unit
+RGPM="NextSeqX" # Platform modeLl
+LANE="_L8" # Lane number
+RGPU=${RGPM}${LANE} # Identifier for the platform unit (run barcode, flowcell barcode, etc.)
 
 ### SETTING WORKING DIRECTORY WHERE BWA OUTPUTS WILL GO ###
 # Make alignments_untrimmed folder
@@ -146,58 +160,69 @@ mkdir ${HEADER}  #makes a directory for each biological sample.
 mkdir -p ${HEADER}
 
 ### Map reads to the genome AND Quality filter and sort sam, making a bam file
-echo "Aligning bwa mem quality filtering, and sorting for ${SAMPLE}"
+# echo "Aligning bwa mem quality filtering, and sorting for ${SAMPLE}"
 
-bwa mem -t ${THREADS} ${REF} ${R1} ${R2} | \
-samtools view -hb -@ ${THREADS} - | \
-samtools sort -n -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_sorted.bam
+# bwa mem -t ${THREADS} ${REF} ${R1} ${R2} | \
+# samtools view -hb -@ ${THREADS} - | \
+# samtools sort -n -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_sorted.bam
 
-samtools fixmate -rm -@ ${THREADS} ${HEADER}/${SAMPLE}_aln_pe_sorted.bam - | \
-samtools sort -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam
+# samtools fixmate -rm -@ ${THREADS} ${HEADER}/${SAMPLE}_aln_pe_sorted.bam - | \
+# samtools sort -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam
 
 ### Add read groups
 echo "Adding read group information to ${SAMPLE}"
 
-java -jar $PICARD AddOrReplaceReadGroups \
-    I=${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam \
-    O=${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
-    RGSM=${SAMPLE} \
-    RGID=${SEQID} \
-    RGLB=$RGLB \
-    RGPL=$RPGL \
-    RGPU=$RGPU \
-    VALIDATION_STRINGENCY=LENIENT # adds read groups
+gatk AddOrReplaceReadGroups \
+    --INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam \
+    --OUTPUT ${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
+    --RGSM ${SAMPLE} \
+    --RGID ${SEQID} \
+    --RGLB $RGLB \
+    --RGPL $RPGL \
+    --RGPU $RGPU \
+    --VALIDATION_STRINGENCY LENIENT # adds read groups
+
+# java -jar $PICARD AddOrReplaceReadGroups \
+#     --INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam \
+#     --OUTPUT ${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
+#     --RGSM ${SAMPLE} \
+#     --RGID ${SEQID} \
+#     --RGLB $RGLB \
+#     --RGPL $RPGL \
+#     --RGPU $RGPU \
+#     --VALIDATION_STRINGENCY LENIENT # adds read groups
+
 
 echo "End Alignment"
 
 ### MARK AND REMOVE DUPLICATE READS ###
-# echo "Marking and removing duplicate reads"
+echo "Marking and removing duplicate reads"
 
-# java -jar $PICARD MarkDuplicates \
-#      I=${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
-#      O=${HEADER}/${SAMPLE}_markdup.bam \
-#      METRICS_FILE=${HEADER}/${SAMPLE}_dup_metrics.txt \
-#      ASSUME_SORTED=true \
-#      REMOVE_DUPLICATES=true \
-#      VALIDATION_STRINGENCY=LENIENT \
-#      TMP_DIR=$TMPDIR
+gatk MarkDuplicates \
+    --INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
+    --OUTPUT ${HEADER}/${SAMPLE}_markdup.bam \
+    --METRICS_FILE ${HEADER}/${SAMPLE}_dup_metrics.txt \
+    --ASSUME_SORTED true \
+    --REMOVE_DUPLICATES true \
+    --VALIDATION_STRINGENCY LENIENT \
+    --TMP_DIR $TMPDIR
 
-# echo "End Marking and removing duplicate reads"
+echo "End Marking and removing duplicate reads"
 
-# ### INDEXING THE BAM FILE & FLAG STATS##
-# echo "Indexing the bam file and calculating flag stats"
+### INDEXING THE BAM FILE & FLAG STATS##
+echo "Indexing the bam file and calculating flag stats"
 
-# samtools index -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam
+samtools index -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam
 
-# echo "End Indexing"
+echo "End Indexing"
 
-# ### LOOKING AT ALIGNMENT AGAIN ###
-# ### `flagstat` counts the number of alignments for each FLAG type and calculates and prints statistics
-# echo "Calculating flag stats"
-# samtools flagstat -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam \
-#    > ${HEADER}/${SAMPLE}_markdup.bam.flagstat.txt
+### LOOKING AT ALIGNMENT AGAIN ###
+### `flagstat` counts the number of alignments for each FLAG type and calculates and prints statistics
+echo "Calculating flag stats"
+samtools flagstat -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam \
+   > ${HEADER}/${SAMPLE}_markdup.bam.flagstat.txt
 
-# echo "End Flag Stats"
+echo "End Flag Stats"
 
 module purge
 echo "End Job"

@@ -14,6 +14,7 @@
 
 ### LOAD MODULES ###
 module load java-openjdk
+module load gatk/4.5.0.0
 
 ###################################################################
 ### Adding or replacing read group information in the bam files ###
@@ -26,7 +27,7 @@ WD="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD
 REF="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/MimulusGuttatus_reference/MguttatusTOL_551_v5.0.fa" # Path to reference genome
 THREADS=20 # Number of threads to use
 TMPDIR="/lustre/project/svanbael/TMPDIR" # Designated storage folders for temporary files (should be empty at end)
-PICARD="/share/apps/picard/2.20.7/picard.jar" # Path to picard
+#PICARD="/share/apps/picard/2.20.7/picard.jar" # Path to picard
 
 ### CHANGE DIRECTORY TO WHERE THE BAM FILES ARE LOCATED ###
 cd ${WD}
@@ -42,24 +43,28 @@ echo ${SAMPLE}
 
 
 ### VARIABLES FOR READ GROUP INFORMATION ###
-RGID= "bar_mim3" # Read group identifier/project name
-RGLB="lib1" # Library name (could be anything)
+RGID=${SEQID} # Read group identifier/project name. In this case it is the same as $SEQID. 
+              # It can be called variable by just writing "bar_mim3", for example.
+RGLB="8850_240112B9" # Library name (could be anything). Using the order # and run date.
 RGPL="ILLUMINA" # Sequencing platform
-RGPU="unit1" # Generic identifier for the platform unit
+RGPM="NextSeqX" # Platform modeLl
+LANE="_L8" # Lane number
+RGPU=${RGPM}${LANE} # Identifier for the platform unit (run barcode, flowcell barcode, etc.)
 
 # This tool enables the user to either replace all read groups in the input file or \
 # to add a read group to each read that does not have a read group. Which could be the source of errors.
 echo "Adding or replacing read group information"
 
- java -jar $PICARD AddOrReplaceReadGroups \
-       -I ${HEADER}/${SAMPLE}_markdup.bam \
-       -O ${HEADER}/${SAMPLE}_markdup_rrg.bam \
-       -RGID $RGID \
-       -RGLB $RGLB \
-       -RGPL $RGPL \
-       -RGPU $RGPU \
-       -RGSM ${SAMPLE} \
-       -VALIDATION_STRINGENCY LENIENT
+#java -jar $PICARD AddOrReplaceReadGroups \
+gatk AddOrReplaceReadGroups \
+    -I ${HEADER}/${SAMPLE}_markdup.bam \
+    -O ${HEADER}/${SAMPLE}_markdup_rrg.bam \
+    -RGID $RGID \
+    -RGLB $RGLB \
+    -RGPL $RGPL \
+    -RGPU $RGPU \
+    -RGSM ${SAMPLE} \
+    -VALIDATION_STRINGENCY LENIENT
 
 
 module purge

@@ -13,7 +13,7 @@
 #### load modules###
 module load fastqc
 module load gnuparallel
-module load anaconda3/2023.07
+module load anaconda3/2023.07 # This is to load the conda environment. Comment out as needed
 #unset PYTHONPATH
 
 #source activate /lustre/project/kferris/conda/conda-envs/qc_env # This is to load a virtual environment from which to load 'multiqc'
