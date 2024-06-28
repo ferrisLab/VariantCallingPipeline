@@ -91,19 +91,20 @@ R2=$(find ${WD} \
     | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
 
 
-echo ${R1}
-echo ${R2}
-echo ${SLURM_ARRAY_TASK_ID}
+echo "R1: ${R1}"
+echo "R2: ${R2}"
+echo "ARRAY_TASK_ID:${SLURM_ARRAY_TASK_ID}"
 
 # Sample prefix from the R1/R2 files, is in the sample_names.list (ex: KGF_02.._L3)
 # This part changes based on the naming system. The user will have to modify this as needed
 # The first "SAMPLE" command takes the file name in the xth field of the "/" delimiter, so you want to make sure that you have the full file path written and it is in that position. 
 # So if you input "/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/2_fastQC/OPN_11_2_F2WY.2.fq.gz" you get "OPN_11_2_F2WY" for both sample and header in this code. 
+
 SAMPLE=$(echo $R1 | cut -d "/" -f 10 | cut -d "." -f 1) # Retrieves first element before "."
 HEADER=$(echo $R1 | cut -d "/" -f 10 | cut -d "." -f 1) # Retrieves first element before "." 
 
-echo ${SAMPLE}
-echo ${HEADER}
+echo "SAMPLE: ${SAMPLE}"
+echo "HEADER: ${HEADER}"
 
 
 #####################################################################

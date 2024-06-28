@@ -27,7 +27,7 @@ echo "Start Job"
 WD="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/alignments_untrimmed/" 
 cd ${WD}
 
-### ASSIGNING VARIABLES ###
+###  RETRIEVING SAMPLE NAMES AND ASSIGNING AS VARIABLES ###
 P=$(find ${WD}* -type d \
     | sort \
     | awk -v line=${SLURM_ARRAY_TASK_ID} 'line==NR')
@@ -35,8 +35,9 @@ P=$(find ${WD}* -type d \
 SAMPLE=$(echo $P | cut -d "/" -f 11) #Retrieves sample name
 HEADER=$(echo $P | cut -d "/" -f 11)
 
-echo ${SAMPLE}
-echo ${HEADER}
+### Print Directory and File Name Variables ###
+echo "SAMPLE: ${SAMPLE}"
+echo "HEADER: ${HEADER}"
 
 #PICARD="/share/apps/picard/2.20.7/picard.jar" # Path to picard
 

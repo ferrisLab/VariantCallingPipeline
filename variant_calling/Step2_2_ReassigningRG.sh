@@ -39,13 +39,18 @@ P=$(find ${WD}* -type d \
 
 SAMPLE=$(echo $P | cut -d "/" -f 11) #Retrieves sample name
 HEADER=$(echo $P | cut -d "/" -f 11)
-echo ${SAMPLE}
 
+### Print Directory and File Name Variables ###
+echo "SAMPLE: ${SAMPLE}"
+echo "HEADER: ${HEADER}"
 
-### VARIABLES FOR READ GROUP INFORMATION ###
-RGID=${SEQID} # Read group identifier/project name. In this case it is the same as $SEQID. 
-              # It can be called variable by just writing "bar_mim3", for example.
-RGLB="8850_240112B9" # Library name (could be anything). Using the order # and run date.
+### Print File and Job Variables ###
+echo "ARRAY_TASK_ID: ${SLURM_ARRAY_TASK_ID}"
+
+### READ GROUP VARIABLES ###
+RGID="${SEQID}_8850_240112B9" # Read group identifier/project name. In this case it is the same as $SEQID. 
+              # It can be called variable by just writing "bar_mim3" and the order # and run date, for example.
+RGLB= # Library name (could be anything). Using the order # and run date.
 RGPL="ILLUMINA" # Sequencing platform
 RGPM="NextSeqX" # Platform modeLl
 LANE="_L8" # Lane number
@@ -57,14 +62,15 @@ echo "Adding or replacing read group information"
 
 #java -jar $PICARD AddOrReplaceReadGroups \
 gatk AddOrReplaceReadGroups \
-    -I ${HEADER}/${SAMPLE}_markdup.bam \
-    -O ${HEADER}/${SAMPLE}_markdup_rrg.bam \
-    -RGID $RGID \
-    -RGLB $RGLB \
-    -RGPL $RGPL \
-    -RGPU $RGPU \
-    -RGSM ${SAMPLE} \
-    -VALIDATION_STRINGENCY LENIENT
+    --INPUT ${HEADER}/${SAMPLE}_markdup.bam \
+    --OUTPUT ${HEADER}/${SAMPLE}_markdup_rrg.bam \
+    --RGSM ${SAMPLE} \
+    --RGID ${SEQID} \
+    --RGLB $RGLB \
+    --RGPL $RPGL \
+    --RGPU $RGPU \
+    --TMP_DIR $TMPDIR \
+    --VALIDATION_STRINGENCY LENIENT # adds read groups
 
 
 module purge

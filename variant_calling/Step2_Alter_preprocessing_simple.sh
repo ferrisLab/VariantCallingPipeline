@@ -7,10 +7,12 @@
 #SBATCH --qos=normal
 #SBATCH --time=0-24:00:00
 #SBATCH --mem=256000 #Up to 256000, the maximum increases queue time
-#SBATCH --nodes=2            #: Number of Nodes
+#SBATCH --nodes=1            #: Number of Nodes
 #SBATCH --ntasks-per-node=1  #: Number of Tasks per Node
 #SBATCH --cpus-per-task=20   #: Number of threads per task
-#SBATCH --array=1-474  # Job array (1-n) when n is number of unique samples that came off the sequencer. 499 total
+
+
+# --array=1-474  # Job array (1-n) when n is number of unique samples that came off the sequencer. 499 total
 
 
 ### LOAD MODULES ###
@@ -46,7 +48,6 @@ To-dos:
     See https://gatk.broadinstitute.org/hc/en-us/articles/360036194592-Getting-started-with-GATK4
     https://gatk.broadinstitute.org/hc/en-us/articles/360035531892-GATK4-command-line-syntax
 
-
 This script is designed to prepare samples for GATK variant calling. 
 It begins with sequence files in seqdata.fq.gz or seqdata.fq format.
 
@@ -74,7 +75,6 @@ https://eriqande.github.io/eca-bioinf-handbook/alignment-of-sequence-data-to-a-r
 In summary, the steps taken should be asigning read groups, aligning with bwa, and
 processing with samtools
 
-
 Input file:  ${SAMPLE}_aln_pe_sorted.bam
 Output files:${SAMPLE}_merged.bam
                 ${SAMPLE}_markdup.bam
@@ -96,7 +96,7 @@ PICARD="/lustre/project/svanbael/bolivar/software/picard/build/libs/picard.jar" 
 OUTPUT_DIR="/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/3_preprocessing/alignments_untrimmed/" # Path to directory where alignment files will be stored
 
 ### NAVIGATING TO THE DIRECTORY CONTAINING THE FASTQ FILES ###
-### WD should be the directory containing the fastq files ###
+# WD should be the directory containing the fastq files.
 cd ${WD}
 
 ### RETRIEVING SAMPLE NAMES AND ASSIGNING AS VARIABLES ###
@@ -124,16 +124,27 @@ echo "ARRAY_TASK_ID: ${SLURM_ARRAY_TASK_ID}"
 
 # Sample prefix from the R1/R2 files, is in the sample_names.list (ex: KGF_02.._L3)
 # This part changes based on the naming system. The user will have to modify this as needed
-# The first "SAMPLE" command takes the file name in the xth field of the "/" delimiter, so you want to make sure that you have the full file path written and it is in that position. 
-# So if you input "/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/2_fastQC/OPN_11_2_F2WY.2.fq.gz" you get "OPN_11_2_F2WY" for both sample and header in this code. 
+# The first "SAMPLE" command takes the file name in the xth field of the "/" delimiter, 
+# so you want to make sure that you have the full file path written and it is in that position. 
+# So if you input "/lustre/project/svanbael/bolivar/Mimulus_sequences/mim3_bioinformatics/ddRAD/2_fastQC/OPN_11_2_F2WY.2.fq.gz" 
+# you get "OPN_11_2_F2WY" for both sample and header in this code.
+
 SAMPLE=$(echo $R1 | cut -d "/" -f 10 | cut -d "." -f 1) # Retrieves first element before "."
 HEADER=$(echo $R1 | cut -d "/" -f 10 | cut -d "." -f 1) # Retrieves first element before "." 
 
 ### Print Directory and File Name Variables ###
 echo "SAMPLE: ${SAMPLE}"
 echo "HEADER: ${HEADER}"
-
 ### To debug make sure to examine the variables and the files they are assigned to.
+
+### READ GROUP VARIABLES ###
+RGID="${SEQID}_8850_240112B9" # Read group identifier/project name. In this case it is the same as $SEQID. 
+              # It can be called variable by just writing "bar_mim3" and the order # and run date, for example.
+#RGLB=${SAMPLE} # Library name (could be anything). Using the order # and run date.
+RGPL="ILLUMINA" # Sequencing platform
+RGPM="NextSeqX" # Platform modeLl
+LANE="_L8" # Lane number
+RGPU=${RGPM}${LANE} # Identifier for the platform unit (run barcode, flowcell barcode, etc.)
 
 ##################################################################################
 ### Alternative Pipeline for alignment with BWA, quality control with SAMTOOLS, 
@@ -141,23 +152,10 @@ echo "HEADER: ${HEADER}"
 ###################################################################################
 # Adapted from @bergcollete's GitHub: YNP_GWAS/scripts/YNP4alignment.sh 
 
-### VARIABLES FOR READ GROUP INFORMATION ###
-RGID=${SEQID} # Read group identifier/project name. In this case it is the same as $SEQID. 
-              # It can be called variable by just writing "bar_mim3", for example.
-RGLB="8850_240112B9" # Library name (could be anything). Using the order # and run date.
-RGPL="ILLUMINA" # Sequencing platform
-RGPM="NextSeqX" # Platform modeLl
-LANE="_L8" # Lane number
-RGPU=${RGPM}${LANE} # Identifier for the platform unit (run barcode, flowcell barcode, etc.)
-
 ### SETTING WORKING DIRECTORY WHERE BWA OUTPUTS WILL GO ###
 # Make alignments_untrimmed folder
 cd ${OUTPUT_DIR}
-mkdir ${HEADER}  #makes a directory for each biological sample.
-
-
-### CREATE OUTPUT DIRECTORY ###
-mkdir -p ${HEADER}
+#mkdir -p ${HEADER}  #makes a directory for each biological sample.
 
 ### Map reads to the genome AND Quality filter and sort sam, making a bam file
 # echo "Aligning bwa mem quality filtering, and sorting for ${SAMPLE}"
@@ -170,16 +168,19 @@ mkdir -p ${HEADER}
 # samtools sort -T $TMPDIR -@ ${THREADS} - -o ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam
 
 ### Add read groups
-echo "Adding read group information to ${SAMPLE}"
+#echo "Adding read group information to ${SAMPLE}"
+#    --INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam \
+#    --OUTPUT ${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
 
 gatk AddOrReplaceReadGroups \
-    --INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_sorted.bam \
-    --OUTPUT ${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
-    --RGSM ${SAMPLE} \
+    --INPUT CF_11_10_F2YW/CF_11_10_F2YW_aln_pe_sorted.bam \
+    --OUTPUT CF_11_10_F2YW/CF_11_10_F2YW_aln_pe_fm_rg_sorted.bam \
+    --RGSM CF_11_10_F2YW \
     --RGID ${SEQID} \
     --RGLB $RGLB \
     --RGPL $RPGL \
     --RGPU $RGPU \
+    --TMP_DIR $TMPDIR \
     --VALIDATION_STRINGENCY LENIENT # adds read groups
 
 # java -jar $PICARD AddOrReplaceReadGroups \
@@ -196,33 +197,34 @@ gatk AddOrReplaceReadGroups \
 echo "End Alignment"
 
 ### MARK AND REMOVE DUPLICATE READS ###
-echo "Marking and removing duplicate reads"
+# echo "Marking and removing duplicate reads"
 
-gatk MarkDuplicates \
-    --INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
-    --OUTPUT ${HEADER}/${SAMPLE}_markdup.bam \
-    --METRICS_FILE ${HEADER}/${SAMPLE}_dup_metrics.txt \
-    --ASSUME_SORTED true \
-    --REMOVE_DUPLICATES true \
-    --VALIDATION_STRINGENCY LENIENT \
-    --TMP_DIR $TMPDIR
+# gatk MarkDuplicates \
+#     --INPUT ${HEADER}/${SAMPLE}_aln_pe_fm_rg_sorted.bam \
+#     --OUTPUT ${HEADER}/${SAMPLE}_markdup.bam \
+#     --METRICS_FILE ${HEADER}/${SAMPLE}_dup_metrics.txt \
+#     --ASSUME_SORTED true \
+#     --REMOVE_DUPLICATES true \
+#     --VALIDATION_STRINGENCY LENIENT \
+#     --TMP_DIR $TMPDIR
 
-echo "End Marking and removing duplicate reads"
+# echo "End Marking and removing duplicate reads"
 
-### INDEXING THE BAM FILE & FLAG STATS##
-echo "Indexing the bam file and calculating flag stats"
+# ### INDEXING THE BAM FILE & FLAG STATS ##
+# echo "Indexing the bam file and calculating flag stats"
 
-samtools index -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam
+# samtools index -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam
 
-echo "End Indexing"
+# echo "End Indexing"
 
-### LOOKING AT ALIGNMENT AGAIN ###
-### `flagstat` counts the number of alignments for each FLAG type and calculates and prints statistics
-echo "Calculating flag stats"
-samtools flagstat -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam \
-   > ${HEADER}/${SAMPLE}_markdup.bam.flagstat.txt
+# ### LOOKING AT ALIGNMENT AGAIN ###
+# ### `flagstat` counts the number of alignments for each FLAG type and calculates and prints statistics
+# echo "Calculating flag stats"
 
-echo "End Flag Stats"
+# samtools flagstat -@ ${THREADS} ${HEADER}/${SAMPLE}_markdup.bam \
+#    > ${HEADER}/${SAMPLE}_markdup.bam.flagstat.txt
+
+# echo "End Flag Stats"
 
 module purge
 echo "End Job"
